@@ -1,0 +1,8 @@
+/.playwright-mcp
+/src
+/node_modules
+password_template.html
+.staticrypt.json
+.env
+src
+package*.json
