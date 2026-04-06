@@ -6,3 +6,4 @@ password_template.html
 .env
 src
 package*.json
+.DS_Store

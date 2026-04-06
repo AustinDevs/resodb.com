@@ -1,12 +1,10 @@
-/* RESO DB — 4-Step Analytics Demo */
+/* RESO DB — 2-Step Analytics Demo */
 
 (function () {
   'use strict';
 
   /* ── Data from content/query-example.txt ── */
   var QUESTION = 'What are the zipcodes with the highest percent of closed listings sold above list price in the last 6 months within 5 miles of coordinates 30.3181, -97.748?';
-
-  var SQL_CLICKHOUSE = 'SELECT\n    PostalCode,\n    count() AS closed_listings,\n    sum(if(ClosePrice > ListPrice, 1, 0)) AS sold_above_list_count,\n    round(100.0 * sold_above_list_count / closed_listings, 2) AS sold_above_list_pct\nFROM Property\nWHERE\n    (MlsStatus = \'Closed\' OR StandardStatus = \'Closed\')\n    AND CloseDate >= addMonths(today(), -6)\n    AND ClosePrice IS NOT NULL\n    AND ListPrice IS NOT NULL\n    AND Latitude IS NOT NULL\n    AND Longitude IS NOT NULL\n    AND greatCircleDistance(Longitude, Latitude, -97.748, 30.3181) <= 8046.72\n    AND PostalCode != \'\'\nGROUP BY PostalCode\nHAVING closed_listings >= 5\nORDER BY sold_above_list_pct DESC, closed_listings DESC\nLIMIT 100';
 
   var SQL_POSTGRES = 'SELECT\n    "PostalCode",\n    COUNT(*) AS closed_listings,\n    SUM(CASE WHEN "ClosePrice" > "ListPrice" THEN 1 ELSE 0 END) AS sold_above_list_count,\n    ROUND(100.0 * SUM(CASE WHEN "ClosePrice" > "ListPrice" THEN 1 ELSE 0 END) / COUNT(*), 2) AS sold_above_list_pct\nFROM "Property"\nWHERE\n    ("MlsStatus" = \'Closed\' OR "StandardStatus" = \'Closed\')\n    AND "CloseDate" >= CURRENT_DATE - INTERVAL \'6 months\'\n    AND "ClosePrice" IS NOT NULL\n    AND "ListPrice" IS NOT NULL\n    AND "Latitude" IS NOT NULL\n    AND "Longitude" IS NOT NULL\n    AND earth_distance(\n        ll_to_earth("Latitude", "Longitude"),\n        ll_to_earth(30.3181, -97.748)\n    ) <= 8046.72\n    AND "PostalCode" != \'\'\nGROUP BY "PostalCode"\nHAVING COUNT(*) >= 5\nORDER BY sold_above_list_pct DESC, closed_listings DESC\nLIMIT 100';
 
@@ -15,7 +13,6 @@
   var SQL_SQLSERVER = 'SELECT TOP 100\n    PostalCode,\n    COUNT(*) AS closed_listings,\n    SUM(CASE WHEN ClosePrice > ListPrice THEN 1 ELSE 0 END) AS sold_above_list_count,\n    ROUND(100.0 * SUM(CASE WHEN ClosePrice > ListPrice THEN 1 ELSE 0 END) / COUNT(*), 2) AS sold_above_list_pct\nFROM Property\nWHERE\n    (MlsStatus = \'Closed\' OR StandardStatus = \'Closed\')\n    AND CloseDate >= DATEADD(MONTH, -6, GETDATE())\n    AND ClosePrice IS NOT NULL\n    AND ListPrice IS NOT NULL\n    AND Latitude IS NOT NULL\n    AND Longitude IS NOT NULL\n    AND geography::Point(Latitude, Longitude, 4326).STDistance(\n        geography::Point(30.3181, -97.748, 4326)\n    ) <= 8046.72\n    AND PostalCode != \'\'\nGROUP BY PostalCode\nHAVING COUNT(*) >= 5\nORDER BY sold_above_list_pct DESC, closed_listings DESC';
 
   var SQL_MAP = {
-    clickhouse: SQL_CLICKHOUSE,
     postgresql: SQL_POSTGRES,
     mysql: SQL_MYSQL,
     sqlserver: SQL_SQLSERVER
@@ -93,7 +90,6 @@
           sortAsc = true;
         }
         renderTable(demo);
-        // Update sort arrows
         demo.querySelectorAll('.data-table th').forEach(function (h) {
           h.classList.remove('sorted');
         });
@@ -101,6 +97,22 @@
         th.querySelector('.sort-arrow').setAttribute('icon', sortAsc ? 'line-md:arrow-small-up' : 'line-md:arrow-small-down');
       });
     });
+
+    // "For the devs" toggle
+    var devToggle = demo.querySelector('#dev-toggle');
+    var devContent = demo.querySelector('#dev-content');
+    if (devToggle && devContent) {
+      devToggle.addEventListener('click', function () {
+        var isOpen = devContent.style.display !== 'none';
+        devContent.style.display = isOpen ? 'none' : 'block';
+        devToggle.classList.toggle('open', !isOpen);
+        var icon = devToggle.querySelector('.dev-toggle-icon');
+        if (icon) {
+          icon.setAttribute('icon', isOpen ? 'line-md:chevron-right' : 'line-md:chevron-down');
+        }
+        if (!isOpen) renderTable(demo);
+      });
+    }
 
     goToStep(0);
   }
@@ -124,9 +136,8 @@
       el.classList.toggle('active', i === step);
     });
 
-    // Render step-specific content
-    if (step === 2) renderTable(demo);
-    if (step === 3 && typeof window.initDemoCharts === 'function') {
+    // Render charts + AI on step 2 (Answer)
+    if (step === 1 && typeof window.initDemoCharts === 'function') {
       window.initDemoCharts(RESULTS);
     }
   }
